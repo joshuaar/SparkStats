@@ -1,3 +1,5 @@
+##Spark Simple Example
+
 fooling around with spark. 
 
 This may be useful as a template for creating additional projects.
