@@ -53,8 +53,9 @@ object SimpleApp {
   
   def main(args: Array[String]) {
     val logFile = s"/home/josh/CIM/Research/labdata/jaricher/healthtell/CRCvNorm.csv" // Should be some file on your system
+    println("Reading Data")
     val data = readData(logFile)
-
+    println("Spark Part")
     val sc = new SparkContext("local", "Simple App", SPARK_HOME)
     val rddata = sc.parallelize(data,2*8)
     val dataSums = rddata.map( attr => attr.map( grp => (grp._1,grp._2.reduce( (a,b) => a+b )) ) )
