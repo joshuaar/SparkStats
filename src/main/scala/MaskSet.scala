@@ -16,20 +16,28 @@ trait Entropable {
   def getEntropy():Double
 }
 
-class MaskSet(order:MaskOrder,holes:Array[MaskHoles]) extends Matable with Entropable {
+class MaskSet(order:MaskOrder,holes:Array[MaskHoles],length:Int) extends Matable with Entropable {
     override type suitable = MaskSet
+    def length():Int = {
+      return length
+    }
 	def getGenetics():(MaskOrder, Array[MaskHoles]) = {
 	  (order,holes)
 	}
 	def mate(partner:suitable):suitable = {
 	  val (orderPartner,holesOther) = partner.getGenetics()
 	  val newOrder = order.mate(orderPartner,order.length)
-	  val newHoles = (holes,holesOther).zipped.map( (k1,k2) => k1.mate(k2,order.length))
-	  new MaskSet(newOrder,newHoles)
+	  val newHoles = (holes,holesOther).zipped.map( (k1,k2) => k1.mate(k2,length()))
+	  new MaskSet(newOrder,newHoles,length)
 	}
+	
+	def getPeptides():Array[String] = {
+	  holes.map(i=>i.getPeptide(order))
+	}
+	
 	override def getEntropy():Double = {
 	  //This is SLLLOOOWWW
-	  val peps = holes.map(i=>i.getPeptide(order))
+	  val peps = getPeptides()
 	  MaskSet.peptideEntropy(peps)
 	}
   
@@ -37,8 +45,19 @@ class MaskSet(order:MaskOrder,holes:Array[MaskHoles]) extends Matable with Entro
 object MaskSet {
   def peptideEntropy(peps:Iterable[String]):Double = {
     //This is SLLLOOOOWWW
-    val wins = peps.map(i=>window(i,5).toSet).reduce( (a,b) => a.union(b) )
-    return wins.count( a => true )
+    val wins = peps.view.flatMap(i=>window(i,5))
+    val winCounts = scala.collection.mutable.Map[String,Int]()
+    var finalCount = 0
+    for(i <- wins){
+      val k = winCounts += (i -> (winCounts.get(i) match {
+        case Some(count) => count + 1
+        case None => {
+          finalCount +=1
+          1
+        }
+      }))
+    }
+    return winCounts.count(a=>true)
   }
   
   def window(peptide:String,length:Int):Seq[String] = {
@@ -48,13 +67,17 @@ object MaskSet {
   }
   val alpha = "ACDEFGHIKLMNPQRSTVWY"
   val r = new Random()
-  def apply(nPeps:Int,nMasks:Int) = {
+  
+  def apply(nPeps:Int,nMasks:Int,length:Int) = {
     val maskOrder = (for(i <- (0 until nMasks)) yield alpha(r.nextInt(alpha.length)).toString).foldRight("")( (a,b)=>a+b )
-    val maskHoles = (for(i <- (0 until nPeps)) yield genHoles(nMasks)).toArray
-    new MaskSet(new MaskOrder(maskOrder),maskHoles)
+    val maskHoles = (for(i <- (0 until nPeps)) yield genHoles(nMasks,length)).toArray
+    new MaskSet(new MaskOrder(maskOrder),maskHoles,length)
   }
-  def genHoles(nMasks:Int):MaskHoles = {
-    return new MaskHoles((for(i <- 0 until nMasks) yield r.nextBoolean).toArray)
+  def genHoles(nMasks:Int,length:Int):MaskHoles = {
+    val masks = (for(i <- 0 until nMasks) yield false).toArray
+    val indicies = Random.shuffle((0 until nMasks).toList).slice(0,length)
+    for(i <- indicies) {masks(i)=true}
+    return new MaskHoles(masks)
   }
 }
 
@@ -107,10 +130,11 @@ class MaskHoles(maskMatrix: Array[Boolean]) extends Cuttable  {
     val b = a.filter( k => k._1 ).map( k => k._2.toString )
     b.foldRight("")( (k1,k2) => k1+k2)
   }
-  def mate(partner:MaskHoles, cutPoint:Int):MaskHoles = {
+  def mate(partner:MaskHoles, length:Int):MaskHoles = {
+    val cutPoint = Random.nextInt(maskMatrix.length-1)
     val (holesA1,holesA2) = cut(cutPoint)
     val (holesB1,holesB2) = partner.cut(cutPoint)
-    holesA1.paste(holesB2,maskMatrix.length)
+    holesA1.paste(holesB2,length)
   }
 
 }
