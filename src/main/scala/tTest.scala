@@ -1,7 +1,12 @@
+package com.protomapper.masks
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 import math._
+import scala.util.Random
+
+
+
 
 object SimpleApp {
   val SPARK_HOME = "/home/josh/software/spark-0.9.0-incubating"
@@ -48,21 +53,43 @@ object SimpleApp {
     val df = pow((s1/n1) + (s2/n2),2) / ( (pow(s1,4)/(pow(n1,2)*v1)) + (pow(s2,4)/(pow(n2,2)*v2)) )
     return (stat, df)
   }
+  val nChunks = 16
+  val sc = new SparkContext(s"local[${nChunks}]", "Simple App", SPARK_HOME)
   
   
+  def generationCycle(population:RDD[MaskSet],nextPop:Int,mutationRate:Double,nFit:Int=4):RDD[MaskSet] = {
+    val entropies = population.map(indiv => (indiv.getEntropy(),indiv))
+    val ent2 = entropies.sortByKey(false)
+    
+    val fittest = ent2.take(nFit)
+    println(s"Fittest: ${fittest(0)._1} Max: ${fittest(0)._2.getMaxEntropy()}")
+    println(s"SecondFittest: ${fittest(1)._1} Max: ${fittest(0)._2.getMaxEntropy()}")
+    val nChildren = (nextPop/(nFit/2)).toInt
+    val fittestPar = sc.parallelize(fittest,nChunks)
+    fittestPar.flatMap( a => {
+      for(i <- 0 until nChildren) yield a._2.mutate(mutationRate) //mate a certain number of times for each pair
+      } )
+  }
+  
+  def getFittest(population:RDD[MaskSet]):MaskSet = {
+    val entropies = population.map(indiv => (indiv.getEntropy(),indiv))
+    val ent2 = entropies.sortByKey(false,nChunks)
+    ent2.take(1)(0)._2
+  }
   
   def main(args: Array[String]) {
-    val logFile = s"/home/josh/CIM/Research/labdata/jaricher/healthtell/CRCvNorm.csv" // Should be some file on your system
-    println("Reading Data")
-    val data = readData(logFile)
-    println("Spark Part")
-    val sc = new SparkContext("local", "Simple App", SPARK_HOME)
-    val rddata = sc.parallelize(data,2*8)
-    val dataSums = rddata.map( attr => attr.map( grp => (grp._1,grp._2.reduce( (a,b) => a+b )) ) )
-    val totalSum = dataSums.reduce( (a,b) => {
-      val lst = a.toList ++ b.toList
-      lst.groupBy(_._1).map( a => a._2.reduce( (a,b) => (a._1,a._2+b._2) ) )
-    } )
-    println(totalSum)
+    val nPeps = 100000
+    val nMasks = 40
+    val len = 12
+    val popSize = 100
+    val population = ((0 until popSize)).map( a => MaskSet(nPeps,nMasks,len) )
+    var rddata = sc.parallelize(population,nChunks)
+//    println(rddata.map( a => {
+//      for(i <- 1 until 100000000) {
+//        i+ 100
+//      }
+//      1
+//    }).reduce((a,b) => a+b ))
+    for(i <- 0 until 100) rddata = generationCycle(rddata,popSize,0.1,nFit=10)
   }
 }

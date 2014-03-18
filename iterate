@@ -1,0 +1,8 @@
+[0m[[0minfo[0m] [0mLoading project definition from /home/josh/workspace2/SparkStats/project[0m
+[0m[[0minfo[0m] [0mSet current project to Simple Project (in build file:/home/josh/workspace2/SparkStats/)[0m
+[0m[[0minfo[0m] [0mCompiling 1 Scala source to /home/josh/workspace2/SparkStats/target/scala-2.10/classes...[0m
+[0m[[0minfo[0m] [0mRunning com.protomapper.masks.SimpleApp [0m
+Fittest: 92762.0 Max: 800000.0
+SecondFittest: 90219.0 Max: 800000.0
+Fittest: 98996.0 Max: 800000.0
+SecondFittest: 97482.0 Max: 800000.0

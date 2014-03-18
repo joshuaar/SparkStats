@@ -16,6 +16,7 @@ trait Entropable {
   def getEntropy():Double
 }
 
+@serializable
 class MaskSet(order:MaskOrder,holes:Array[MaskHoles],length:Int) extends Matable with Entropable {
     override type suitable = MaskSet
     def length():Int = {
@@ -25,9 +26,19 @@ class MaskSet(order:MaskOrder,holes:Array[MaskHoles],length:Int) extends Matable
 	  (order,holes)
 	}
 	def mate(partner:suitable):suitable = {
+	  val r = new Random()
 	  val (orderPartner,holesOther) = partner.getGenetics()
-	  val newOrder = order.mate(orderPartner,order.length)
+	  val newOrder = order.mate(orderPartner,r.nextInt(order.length))
 	  val newHoles = (holes,holesOther).zipped.map( (k1,k2) => k1.mate(k2,length()))
+	  new MaskSet(newOrder,newHoles,length)
+	}
+	
+	/**
+	 * Mutate the mask order and holes
+	 */
+	def mutate(rate:Double):MaskSet = {
+	  val newHoles = holes.map( a=> a.mutate(rate))
+	  val newOrder = order.mutate(rate)
 	  new MaskSet(newOrder,newHoles,length)
 	}
 	
@@ -39,6 +50,10 @@ class MaskSet(order:MaskOrder,holes:Array[MaskHoles],length:Int) extends Matable
 	  //This is SLLLOOOWWW
 	  val peps = getPeptides()
 	  MaskSet.peptideEntropy(peps)
+	}
+	def getMaxEntropy():Double = {
+	  math.min((length-5+1)*holes.length,math.pow(20,5))
+	  
 	}
   
 }
@@ -82,8 +97,9 @@ object MaskSet {
 }
 
 
-
-class MaskOrder(ordering:String) extends Cuttable{
+@serializable
+class MaskOrder(order:String) extends Cuttable{
+  var ordering = order
   override type suitable = MaskOrder
   def getOrdering():String = {
     return ordering
@@ -102,9 +118,21 @@ class MaskOrder(ordering:String) extends Cuttable{
     val (orderB1,orderB2) = partner.cut(cutPoint)
     orderA1.paste(orderB2,length)
   }
+  def mutate(rate:Double):MaskOrder = {
+    val r = new Random()
+    val nMasks = ordering.length
+    val ord = ordering.toArray
+    for(i <- 0 until math.floor(rate*nMasks).toInt ){
+    	val ix=r.nextInt(nMasks)
+    	ord(ix) = MaskSet.alpha(r.nextInt(MaskSet.alpha.length))
+    }
+    new MaskOrder(ord.mkString)
+  }
 }
 
-class MaskHoles(maskMatrix: Array[Boolean]) extends Cuttable  {
+@serializable
+class MaskHoles(mMatrix: Array[Boolean]) extends Cuttable  {
+  var maskMatrix = mMatrix
   def getMaskMatrix():Array[Boolean] = {
     return maskMatrix
   }
@@ -135,6 +163,20 @@ class MaskHoles(maskMatrix: Array[Boolean]) extends Cuttable  {
     val (holesA1,holesA2) = cut(cutPoint)
     val (holesB1,holesB2) = partner.cut(cutPoint)
     holesA1.paste(holesB2,length)
+  }
+  def mutate(rate:Double):MaskHoles = {
+    require(rate <= 1, "Rate must be between 0 and 1")
+    val r = new Random() // random number generator
+    val matrix = getMaskMatrix().clone
+    val indicies_true = Random.shuffle(matrix.zipWithIndex.filter( a => a._1 ).map(b=>b._2).toList)
+    val indicies_false = Random.shuffle(matrix.zipWithIndex.filter( a => !a._1 ).map(b=>b._2).toList)
+    val toChange = indicies_true.slice(0,(rate*indicies_true.length).toInt)
+    val toChangetoTrue = indicies_false.slice(0,(rate*indicies_true.length).toInt)
+    for(i <- toChange)
+      matrix(i) = false
+    for(j <- toChangetoTrue)
+      matrix(j) = true
+    new MaskHoles(matrix)
   }
 
 }
