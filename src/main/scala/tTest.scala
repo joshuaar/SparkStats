@@ -53,7 +53,7 @@ object SimpleApp {
     val df = pow((s1/n1) + (s2/n2),2) / ( (pow(s1,4)/(pow(n1,2)*v1)) + (pow(s2,4)/(pow(n2,2)*v2)) )
     return (stat, df)
   }
-  val nChunks = 16
+  val nChunks = 24
   val sc = new SparkContext(s"local[${nChunks}]", "Simple App", SPARK_HOME)
   
   
@@ -62,9 +62,9 @@ object SimpleApp {
     val ent2 = entropies.sortByKey(false)
     
     val fittest = ent2.take(nFit)
-    println(s"Fittest: ${fittest(0)._1} Max: ${fittest(0)._2.getMaxEntropy()}")
+    println(s"Fittest: ${fittest(0)._1} Max: ${fittest(0)._2.getMaxEntropy()} nPop:${ent2.count()}")
     println(s"SecondFittest: ${fittest(1)._1} Max: ${fittest(0)._2.getMaxEntropy()}")
-    val nChildren = (nextPop/(nFit/2)).toInt
+    val nChildren = (nextPop/(nFit)).toInt
     val fittestPar = sc.parallelize(fittest,nChunks)
     fittestPar.flatMap( a => {
       for(i <- 0 until nChildren) yield a._2.mutate(mutationRate) //mate a certain number of times for each pair
@@ -81,7 +81,7 @@ object SimpleApp {
     val nPeps = 100000
     val nMasks = 40
     val len = 12
-    val popSize = 100
+    val popSize = 200
     val population = ((0 until popSize)).map( a => MaskSet(nPeps,nMasks,len) )
     var rddata = sc.parallelize(population,nChunks)
 //    println(rddata.map( a => {
